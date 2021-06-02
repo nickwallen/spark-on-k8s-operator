@@ -83,15 +83,22 @@ spec:
         {{- end }}
         resources:
           {{- toYaml .Values.resources | nindent 10 }}
-      {{- if .Values.webhook.enable }}
         volumeMounts:
+          {{- if .Values.webhook.enable }}
           - name: webhook-certs
             mountPath: /etc/webhook-certs
+          {{- end }}
+          - name: job
+            mountPath: /app/dex/storage
       volumes:
+        {{- if .Values.webhook.enable }}
         - name: webhook-certs
           secret:
             secretName: spark-webhook-certs
-      {{- end }}
+        {{- end }}
+        - name: job
+          persistentVolumeClaim:
+            claimName: {{ .Release.Namespace }}-storage-pvc
       {{- with .Values.nodeSelector }}
       nodeSelector:
         {{- toYaml . | nindent 8 }}
