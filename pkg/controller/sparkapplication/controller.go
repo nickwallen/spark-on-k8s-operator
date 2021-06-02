@@ -344,7 +344,24 @@ func (c *Controller) getAndUpdateDriverState(app *v1beta2.SparkApplication) erro
 		}
 	}
 
+	// Update the application state
 	newState := driverStateToApplicationState(driverState)
+	if len(driverPod.Spec.Containers) > 1 {
+		for _, container := range driverPod.Status.ContainerStatuses {
+			if container.Name == "spark-container" {
+				// This is the spark container, not one of the sidecars
+				if container.State.Terminated != nil {
+					// The spark container was terminated
+					if container.State.Terminated.ExitCode == 0 {
+						newState = v1beta2.SucceedingState
+					} else {
+						newState = v1beta2.FailingState
+					}
+				}
+			}
+		}
+	}
+
 	// Only record a driver event if the application state (derived from the driver pod phase) has changed.
 	if newState != app.Status.AppState.State {
 		c.recordDriverEvent(app, driverState, driverPod.Name)
