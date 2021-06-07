@@ -548,6 +548,11 @@ func (c *Controller) syncSparkApplication(key string) error {
 		}
 	case v1beta2.SucceedingState:
 		if !shouldRetry(appCopy) {
+			if err := c.deleteSparkResources(appCopy); err != nil {
+				glog.Errorf("failed to delete resources associated with SparkApplication %s/%s: %v",
+					appCopy.Namespace, appCopy.Name, err)
+				return err
+			}
 			appCopy.Status.AppState.State = v1beta2.CompletedState
 			c.recordSparkApplicationEvent(appCopy)
 		} else {
@@ -560,6 +565,11 @@ func (c *Controller) syncSparkApplication(key string) error {
 		}
 	case v1beta2.FailingState:
 		if !shouldRetry(appCopy) {
+			if err := c.deleteSparkResources(appCopy); err != nil {
+				glog.Errorf("failed to delete resources associated with SparkApplication %s/%s: %v",
+					appCopy.Namespace, appCopy.Name, err)
+				return err
+			}
 			appCopy.Status.AppState.State = v1beta2.FailedState
 			c.recordSparkApplicationEvent(appCopy)
 		} else if isNextRetryDue(appCopy.Spec.RestartPolicy.OnFailureRetryInterval, appCopy.Status.ExecutionAttempts, appCopy.Status.TerminationTime) {
