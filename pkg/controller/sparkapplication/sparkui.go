@@ -44,6 +44,7 @@ var ingressAppNameURLRegex = regexp.MustCompile("{{\\s*[$]appName\\s*}}")
 var ingressAppNamespaceURLRegex = regexp.MustCompile("{{\\s*[$]appNamespace\\s*}}")
 
 func getSparkUIingressURL(ingressURLFormat string, appName string, appNamespace string) string {
+	glog.Infof("Using ingress-url-format: %s where appName: %s, appNamespace: %s", ingressURLFormat, appName, appNamespace)
 	return ingressAppNamespaceURLRegex.ReplaceAllString(ingressAppNameURLRegex.ReplaceAllString(ingressURLFormat, appName), appNamespace)
 }
 
@@ -87,8 +88,20 @@ func createSparkUIIngress(app *v1beta2.SparkApplication, service SparkService, i
 			Namespace:       app.Namespace,
 			Labels:          getResourceLabels(app),
 			OwnerReferences: []metav1.OwnerReference{*getOwnerReference(app)},
+			Annotations: map[string]string{
+				"kubernetes.io/ingress.class":                     "nginx",
+				"nginx.ingress.kubernetes.io/proxy-redirect-from": "http://$host/",
+				"nginx.ingress.kubernetes.io/proxy-redirect-to":   parsedURL.Path,
+				"nginx.ingress.kubernetes.io/rewrite-target":      "/$1",
+				"nginx.ingress.kubernetes.io/x-forwarded-prefix":  parsedURL.Path,
+			},
 		},
 		Spec: extensions.IngressSpec{
+			TLS: []extensions.IngressTLS{
+				{
+					Hosts: []string{parsedURL.Host},
+				},
+			},
 			Rules: []extensions.IngressRule{{
 				Host: parsedURL.Host,
 				IngressRuleValue: extensions.IngressRuleValue{
@@ -101,7 +114,8 @@ func createSparkUIIngress(app *v1beta2.SparkApplication, service SparkService, i
 									IntVal: service.servicePort,
 								},
 							},
-							Path: parsedURL.Path,
+							Path: parsedURL.Path, // TODO should be /sparkpi-8/?(.*) but it is losing the ?(.*)
+							// TODO also check what gets written to the SparkApplication CRD; its incorrect
 						}},
 					},
 				},
